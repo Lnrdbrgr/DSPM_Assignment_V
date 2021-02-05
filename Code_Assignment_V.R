@@ -18,6 +18,7 @@ rm(list = ls())
 library(jsonlite)
 library(httr)
 library(rlist)
+library(ggplot2)
 
 
 
@@ -42,10 +43,11 @@ api_url <- ("https://app.ticketmaster.com/discovery/v2/venues.json?")
 # GET request
 APIcontent <- GET(url = api_url,
                   query = list(apikey = API_key,
+                               locale="*",
                                countryCode = "DE"))
 
 
-venue_results <- content(APIcontent)
+venue_results_ex3 <- content(APIcontent)
 
 
 # The resulting List has three elements. The locations seem to be stored in _embedded/venues.
@@ -67,26 +69,25 @@ venue_data <- data.frame("name" = rep(NA, 20),
 
 
 # how many results?
-no_results <- venue_results$page$size
+no_results <- venue_results_ex3$page$size
 
 
 # extract the data from the list
-
-for (i in 1:no_results){
+for (i in 0:no_results){
   
-  venue_data$name[i] <- venue_results$`_embedded`[[1]][[i]]$name
-  venue_data$city[i] <- venue_results$`_embedded`[[1]][[i]]$city
-  venue_data$postalCode[i] <- venue_results$`_embedded`[[1]][[i]]$postalCode
-  venue_data$address[i] <- venue_results$`_embedded`[[1]][[i]]$address
-  venue_data$url[i] <- venue_results$`_embedded`[[1]][[i]]$url
+  venue_data$name[i] <- venue_results_ex3$`_embedded`[[1]][[i]]$name
+  venue_data$city[i] <- venue_results_ex3$`_embedded`[[1]][[i]]$city
+  venue_data$postalCode[i] <- venue_results_ex3$`_embedded`[[1]][[i]]$postalCode
+  venue_data$address[i] <- venue_results_ex3$`_embedded`[[1]][[i]]$address
+  venue_data$url[i] <- venue_results_ex3$`_embedded`[[1]][[i]]$url
   
   # account for missing values in latitude and longitude
-  if (!is.null(venue_results$`_embedded`[[1]][[i]]$location$longitude)){
-    venue_data$longitude[i] <- venue_results$`_embedded`[[1]][[i]]$location$longitude
+  if (!is.null(venue_results_ex3$`_embedded`[[1]][[i]]$location$longitude)){
+    venue_data$longitude[i] <- venue_results_ex3$`_embedded`[[1]][[i]]$location$longitude
   }
   
-  if (!is.null(venue_results$`_embedded`[[1]][[i]]$location$latitude)){
-    venue_data$latitude[i] <- venue_results$`_embedded`[[1]][[i]]$location$latitude
+  if (!is.null(venue_results_ex3$`_embedded`[[1]][[i]]$location$latitude)){
+    venue_data$latitude[i] <- venue_results_ex3$`_embedded`[[1]][[i]]$location$latitude
   }
   
 }
@@ -107,21 +108,117 @@ dplyr::glimpse(venue_data)
 
 
 
+#### Exercise 4
+
+# data frame to store results
+venue_data <- data.frame("name" = NA,
+                         "city" = NA,
+                         "postalCode" = NA,
+                         "address" = NA,
+                         "url" = NA,
+                         "longitude" = NA,
+                         "latitude" = NA)
 
 
 
 
 
+# get no. of pages we need to loop through
+no_pages <- venue_results_ex3$page$totalPages
+
+# contruct the API url with the API key searching for venues
+api_url <- ("https://app.ticketmaster.com/discovery/v2/venues.json?")
+
+
+for (i in 0:no_pages){
+  
+  # GET request
+  APIcontent <- GET(url = api_url,
+                    query = list(apikey = API_key,
+                                 countryCode = "DE",
+                                 locale="*",
+                                 page = i))
+  
+  # get content
+  venue_results <- content(APIcontent)
+  
+  # help data frame to store results
+  venue_help_df <- data.frame("name" = rep(NA, 20),
+                              "city" = rep(NA, 20),
+                              "postalCode" = rep(NA, 20),
+                              "address" = rep(NA, 20),
+                              "url" = rep(NA, 20),
+                              "longitude" = rep(NA, 20),
+                              "latitude" = rep(NA, 20))
+  
+  
+  # extract the data from the list
+  for (j in 1:20){
+    
+    
+    # account for missing values in latitude and longitude
+    if (!is.null(venue_results$`_embedded`[[1]][[j]]$name)){
+      venue_help_df$name[j] <- venue_results$`_embedded`[[1]][[j]]$name
+    }
+    
+    if (!is.null(venue_results$`_embedded`[[1]][[j]]$city)){
+      venue_help_df$city[j] <- venue_results$`_embedded`[[1]][[j]]$city
+    }
+    
+    if (!is.null(venue_results$`_embedded`[[1]][[j]]$postalCode)){
+      venue_help_df$postalCode[j] <- venue_results$`_embedded`[[1]][[j]]$postalCode
+    }
+    
+    
+    if(length(venue_results$`_embedded`[[1]][[j]]$address)==0){
+      venue_help_df$address[j] <- NA
+    } else if (!is.null(venue_results$`_embedded`[[1]][[j]]$address)){
+      venue_help_df$address[j] <- venue_results$`_embedded`[[1]][[j]]$address
+    }
+    
+    
+    if (!is.null(venue_results$`_embedded`[[1]][[j]]$url)){
+      venue_help_df$url[j] <- venue_results$`_embedded`[[1]][[j]]$url
+    }
+    
+    
+    if (!is.null(venue_results$`_embedded`[[1]][[j]]$location$longitude)){
+      venue_help_df$longitude[j] <- venue_results$`_embedded`[[1]][[j]]$location$longitude
+    }
+    
+    if (!is.null(venue_results$`_embedded`[[1]][[j]]$location$latitude)){
+      venue_help_df$latitude[j] <- venue_results$`_embedded`[[1]][[j]]$location$latitude
+    }
+    
+  }
+  
+  # perform some modification on the data types
+  venue_help_df$city <- as.character(venue_help_df$city)
+  venue_help_df$address <- as.character(venue_help_df$address)
+  venue_help_df$longitude <- as.numeric(venue_help_df$longitude)
+  venue_help_df$latitude <- as.numeric(venue_help_df$latitude)
+  
+  
+  # ignore efficiency for the time being and append the data frame
+  venue_data <- rbind(venue_data, venue_help_df)
+  
+  
+  # sleep for X seconds to stay in line with the guidelines
+  Sys.sleep(0.33)
+  
+}
+
+
+# make some modifications to the data frame
+venue_data_2 <- venue_data[2:12221,]
+
+glimpse(venue_data_2)
 
 
 
-
-
-
-
-
-
-
+# adjust lat and long to extreme points of Germany
+venue_data_2$longitude_mod <- ifelse((venue_data_2$longitude < 5.866944 | venue_data_2$longitude > 15.043611), NA, venue_data_2$longitude)
+venue_data_2$latitude_mod <- ifelse((venue_data_2$latitude < 47.271679 | venue_data_2$latitude > 55.0846), NA, venue_data_2$latitude)
 
 
 
